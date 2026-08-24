@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f2937"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sorties Québec">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<title>Sorties Québec</title>
+<style>
+*{box-sizing:border-box}html,body,#map{height:100%;margin:0}body{font-family:Arial,sans-serif;overflow:hidden}
+#top{position:absolute;z-index:1000;top:env(safe-area-inset-top,0);left:0;right:0;padding:10px;background:#fff;box-shadow:0 2px 10px #0003}
+.row{display:flex;gap:6px}.row input{flex:1;min-width:0}
+input,button{font-size:16px;padding:11px;border:1px solid #bbb;border-radius:9px;background:white}
+button{cursor:pointer}.primary{background:#1f2937;color:#fff;border-color:#1f2937}
+#status{font-size:12px;color:#555;margin-top:6px}
+#loc{position:absolute;z-index:999;right:12px;bottom:25px;border-radius:50%;width:52px;height:52px;padding:0;font-size:22px;box-shadow:0 2px 10px #0004}
+#install{display:none;margin-top:6px;width:100%}
+@media(max-width:600px){.leaflet-control-zoom{display:none}.row button{padding:11px 10px}}
+</style></head>
+<body>
+<div id="map"></div>
+<div id="top"><div class="row">
+<input id="q" placeholder="Sortie, autoroute ou ville" autocomplete="off">
+<button class="primary" onclick="search()">🔎</button>
+</div>
+<div class="row"><button onclick="reset()">Tout afficher</button><button onclick="locate()">📍 Ma position</button></div>
+<button id="install" class="primary" onclick="installApp()">📲 Installer l'application</button>
+<div id="status">Chargement des sorties…</div></div>
+<button id="loc" onclick="locate()">📍</button>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map=L.map('map',{zoomControl:true}).setView([52.2,-71.8],6);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
+const url='https://ws.mapserver.transports.gouv.qc.ca/swtq?service=wfs&version=2.0.0&request=getfeature&typename=ms:sortie_aut&srsname=EPSG:4326&outputformat=geojson';
+let data=null,layer=null,deferred=null;
+function v(p,a){for(const k of a)if(p[k]!=null&&p[k]!=='')return p[k];return '';}
+function popup(p){
+ return '<b>Sortie '+v(p,['nosortie','NO_SORTIE','num_sortie'])+'</b><br>Autoroute/route : '+v(p,['noroute','NO_ROUTE','route'])+
+ '<br>Direction : '+v(p,['direction','DIRECTION'])+'<br>Municipalité : '+v(p,['nommun','NOMMUN','municipalite'])+
+ '<br>Destination : '+v(p,['messagpan','MESSAGPAN','destination']);
+}
+function draw(g){if(layer)map.removeLayer(layer);layer=L.geoJSON(g,{pointToLayer:(f,x)=>L.circleMarker(x,{radius:7,weight:2,fillOpacity:.9}),onEachFeature:(f,l)=>l.bindPopup(popup(f.properties))}).addTo(map);}
+fetch(url).then(r=>r.json()).then(g=>{data=g;draw(g);document.getElementById('status').textContent=g.features.length+' sorties chargées.';try{map.fitBounds(layer.getBounds(),{padding:[20,130]})}catch(e){}}).catch(()=>document.getElementById('status').textContent='Connexion Internet requise.');
+function search(){if(!data)return;let q=document.getElementById('q').value.toLowerCase().trim();let g={type:'FeatureCollection',features:data.features.filter(f=>JSON.stringify(f.properties).toLowerCase().includes(q))};draw(g);document.getElementById('status').textContent=g.features.length+' résultat(s).';if(g.features.length)try{map.fitBounds(layer.getBounds(),{padding:[20,130]})}catch(e){}}
+function reset(){document.getElementById('q').value='';if(data){draw(data);document.getElementById('status').textContent=data.features.length+' sorties chargées.';try{map.fitBounds(layer.getBounds(),{padding:[20,130]})}catch(e){}}}
+function locate(){if(!navigator.geolocation){alert('GPS non disponible.');return}navigator.geolocation.getCurrentPosition(p=>{let x=[p.coords.latitude,p.coords.longitude];map.setView(x,14);L.marker(x).addTo(map).bindPopup('Votre position').openPopup()},()=>alert('Autorisez la localisation dans votre navigateur.'))}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;document.getElementById('install').style.display='block'});
+async function installApp(){if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;document.getElementById('install').style.display='none'}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+</script></body></html>
