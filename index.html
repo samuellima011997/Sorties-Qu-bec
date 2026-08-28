@@ -117,6 +117,21 @@ async function toggleWorks(){
         'Route : '+(p.route||'')+'<br>'+
         'Description : '+(p.description||'')
       );
+       }).addTo(map);
+
+  worksVisible = true;
+
+  document.getElementById('status').textContent =
+    geo.features.length + ' travaux affichés';
+
+  }catch(err){
+    alert('Impossible de charger les travaux routiers.');
+    console.error(err);
+  }
+}
+
+if('serviceWorker' in navigator)
+  navigator.serviceWorker.register('sw.js');
     }
   }).addTo(map);
 
